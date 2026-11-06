@@ -898,6 +898,18 @@ static void ensure_run_dir(void) {
     }
 }
 
+/* Readers poll these files while they are rewritten: write a temporary
+   file and rename it so a reader never sees a truncated one. */
+static FILE *open_replace(const char *path, char *tmp, size_t len) {
+    snprintf(tmp, len, "%s.tmp", path);
+    return fopen(tmp, "w");
+}
+
+static void commit_replace(FILE *fp, const char *tmp, const char *path) {
+    if (fclose(fp) == 0 && rename(tmp, path) == 0) return;
+    unlink(tmp);
+}
+
 static void write_mode_file(daynight_mode_t mode) {
     ensure_run_dir();
     const char *str = (mode == MODE_DAY) ? "day" : "night";
@@ -928,7 +940,8 @@ static void write_sensors_json(const sensor_sample_t *s) {
     int night_pct = raw_threshold_to_pct(s->night_threshold);
     int day_pct   = raw_threshold_to_pct(s->day_threshold);
 
-    FILE *fp = fopen(SENSORS_FILE, "w");
+    char tmp[sizeof(SENSORS_FILE) + 4];
+    FILE *fp = open_replace(SENSORS_FILE, tmp, sizeof(tmp));
     if (!fp) return;
     /* Single fprintf to minimise syscalls */
     fprintf(fp,
@@ -952,7 +965,7 @@ static void write_sensors_json(const sensor_sample_t *s) {
         s->primary_signal, s->night_threshold, night_pct,
         s->day_threshold, day_pct,
         s->daynight_mode, s->isp_mode);
-    fclose(fp);
+    commit_replace(fp, tmp, SENSORS_FILE);
 }
 
 static void write_value_file(const sensor_sample_t *s, daynight_mode_t mode) {
@@ -981,7 +994,8 @@ static void write_value_file(const sensor_sample_t *s, daynight_mode_t mode) {
 
 static void write_history_json(void) {
     ensure_run_dir();
-    FILE *fp = fopen(HISTORY_FILE, "w");
+    char tmp[sizeof(HISTORY_FILE) + 4];
+    FILE *fp = open_replace(HISTORY_FILE, tmp, sizeof(tmp));
     if (!fp) return;
 
     fprintf(fp, "[");
@@ -1011,7 +1025,7 @@ static void write_history_json(void) {
         fprintf(fp, "}");
     }
     fprintf(fp, "]\n");
-    fclose(fp);
+    commit_replace(fp, tmp, HISTORY_FILE);
 }
 
 static void write_state_files(const sensor_sample_t *s, daynight_mode_t mode) {
