@@ -1,0 +1,16 @@
+--- a/arch/mips/xburst/soc-t31/common/gpio.c
++++ b/arch/mips/xburst/soc-t31/common/gpio.c
+@@ -994,6 +994,13 @@
+ 		gpio_set_func(jz, g->func, g->pins);
+ 	}
+ 
++	/*
++	 * On T31ZX, PA25/PA26 share pads with PB15/PB16. Earlier boot stages
++	 * leave them in function 1, which keeps PB15/PB16 from driving low.
++	 */
++	if (!(jz_gpio_chips[GPIO_PORT_A].dev_map[0] & (0x3 << 25)))
++		gpio_set_func(&jz_gpio_chips[GPIO_PORT_A], GPIO_INPUT, 0x3 << 25);
++
+ 	setup_gpio_irq();
+ 	jz_gpiolib_init();
+ 	register_syscore_ops(&gpio_pm_ops);
