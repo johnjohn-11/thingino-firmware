@@ -182,7 +182,7 @@ Read commands:
   get-setting <path>            Print a narrow setting resource JSON
 
 Write and action commands:
-  set-setting <path> <json>     Apply a narrow setting resource update
+  set-setting <path> <json-file> Apply a narrow setting resource update
   apply-config <json-file>      Compatibility bulk config patch
   snapshot [stream]             Write JPEG bytes to stdout
   record continuous|stop [stream]
