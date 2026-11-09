@@ -2,16 +2,14 @@ THINGINO_WEBUI_SITE_METHOD = local
 THINGINO_WEBUI_SITE = $(THINGINO_WEBUI_PKGDIR)/files
 THINGINO_WEBUI_LICENSE = MIT
 
-THINGINO_WEBUI_ASSET_TAG_RAW := $(shell LC_ALL=C find $(THINGINO_WEBUI_PKGDIR)/files/www/a -type f \( -name '*.js' -o -name '*.css' \) -printf '%T@\n' 2>/dev/null | sort -nr | head -n1 | cut -d. -f1)
-THINGINO_WEBUI_ASSET_TAG := $(if $(THINGINO_WEBUI_ASSET_TAG_RAW),$(THINGINO_WEBUI_ASSET_TAG_RAW),$(shell date +%s))
-
+# A rootfs pre-hook, so the pages streamers and plugins install are tagged
+# too. The tag hashes the shipped assets, so any JS or CSS change moves it.
 define THINGINO_WEBUI_APPLY_ASSET_TAG
-	@asset_tag="$(THINGINO_WEBUI_ASSET_TAG)"; \
 	root="$(TARGET_DIR)/var/www"; \
 	script="$(THINGINO_WEBUI_PKGDIR)/scripts/apply_asset_tag.py"; \
-	if [ -z "$$asset_tag" ]; then \
-		asset_tag="$$(date +%s)"; \
-	fi; \
+	asset_tag="$$(cd "$$root/a" 2>/dev/null && \
+		LC_ALL=C find . -type f \( -name '*.js' -o -name '*.css' \) | \
+		LC_ALL=C sort | xargs cat | sha1sum | cut -c1-10)"; \
 	if [ -d "$$root" ] && [ -f "$$script" ]; then \
 		python3 "$$script" "$$asset_tag" "$$root"; \
 	else \
@@ -355,7 +353,6 @@ define THINGINO_WEBUI_INSTALL_TARGET_CMDS
 		printf 'thingino-webui: paranoid mode — vendor files staged\n'; \
 	fi
 
-	$(call THINGINO_WEBUI_APPLY_ASSET_TAG)
 	$(call THINGINO_WEBUI_APPLY_CDN_FALLBACK)
 endef
 
@@ -369,6 +366,7 @@ define THINGINO_WEBUI_PARANOID_REWRITE
 	fi
 endef
 ROOTFS_PRE_CMD_HOOKS += THINGINO_WEBUI_PARANOID_REWRITE
+ROOTFS_PRE_CMD_HOOKS += THINGINO_WEBUI_APPLY_ASSET_TAG
 
 # Plugin assembly finalize hook — runs after every package is installed,
 # discovers *.webui.json manifests, merges nav/scripts/styles, and re-applies
